@@ -4,15 +4,15 @@
 # "Run CCM on datasets" and "Include Climate [...]" can take quite a while and should be skipped if no 
 # changes have been done.
 
-# Everything can be reproduced from scratch using just the files:
-# data_analysis.R
-# utilities.R
-# salmon_data.csv
-# comtrade_banana_prepared.csv
-# CL_FI_COUNTRY_GROUPS.csv
-# CL_FI_SPECIES_GROUPS.csv
-# TS_FI_CAPTURE.csv
-# updated_climatedata.RData
+# Everything can be reproduced from scratch using the following files:
+# Code:           data_analysis.R
+#                 utilities.R
+# Comtrade Data:  salmon_data.RData
+#                 comtrade_banana_prepared.csv
+# FAO Data:       CL_FI_COUNTRY_GROUPS.csv
+#                 CL_FI_SPECIES_GROUPS.csv
+#                 TS_FI_CAPTURE.RData
+# NOAA Data:      updated_climatedata.RData
 
 
 
@@ -31,9 +31,10 @@ library(rlist)
 source("utilities.R")
 #
 
-######## Datapreparation ########
 
-dat_csv <- read_csv("salmon_data.csv")   # already preprocessed 
+######## Datapreparation ########
+  
+load(file = "salmon_data.RData")    # already preprocessed 
 
 dat_csv <- dat_csv %>%
   ungroup() %>%
@@ -42,7 +43,8 @@ dat_csv <- dat_csv %>%
 dat_csv$Period %>% unique() %>% length() # 120 time points!
 dat_csv$link %>% unique() %>% length() # 4483 links
 
-## Delete Bunkers, that's not a country. For more info: http://www.fao.org/faostat/en/#data/EM/metadata
+## Delete Bunkers as that is not a country. For more info: http://www.fao.org/faostat/en/#data/EM/metadata
+## IC is a duplicate of Iceland and needs to be removed as well.
 dat_csv <- filter(dat_csv, importer_name != "Bunkers")
 dat_csv <- filter(dat_csv, importer_name != "Ic")
 dat_csv <- filter(dat_csv, exporter_name != "Ic")
@@ -131,7 +133,7 @@ df <- res$df
 nonlinearity <- res$nonlinearity
 
 interesting_shapes <- c(1, 19, 20, 288, 410) 
-
+par(mar = c(5,8,4,2)+0.1, cex = 1.7)
 plot(nonlinearity[[1]]$theta, nonlinearity[[1]]$rho, ylim = c(0,1), col = 1, type = "l", xlab = "Degree of nonlinearity (Theta)", ylab = "Prediction Skill (Rho)")
 c <- 1
 for(i in interesting_shapes[2:5]){
@@ -143,7 +145,7 @@ l <- colnames(df) %>%  .[interesting_shapes+1] %>% as.data.frame() %>%
   separate(1,  into = c("A", "B"), sep = "_") %>% codes_to_names(cols = 1:2, match = code_match)
 
 legend("topright", legend = paste(l[,1], l[,2], sep = " -> "), col = 1:10, lty = 1)
-
+par(mar = c(5,4,4,2)+0.1, cex = 1)
 
 ######## Analysis Links for Main Dataset #######
 
@@ -167,6 +169,7 @@ links_s %>% filter(B == C) %>% dim() %>% .[1]
 links_s %>% filter(D == A & C == B) %>% dim() %>% .[1]  
 # motif A <- B <- C: 83
 links_s %>% filter(A == D) %>% dim() %>% .[1]
+# number motif 3: 60 + 83 -1 
 # links w/o motif: 3518
 links_s %>% filter(D != A & D != B & C != A & C != B) %>% dim() %>% .[1]  
 
@@ -212,7 +215,7 @@ links_s_wo_motif
 
 ######## Including Climate Dataset (For Main Dataset, Strong links) ########
 
-load(file = "./intermediate_results/updated_climatedata.RData")
+load(file = "updated_climatedata.RData")
 load(file = "./intermediate_results/ccm_res_fresh_frozen.RData")
 
 links <- res$links
@@ -499,12 +502,17 @@ new_extra_links <- c(number_extra_links_through_paths[1], new_extra_links)
 
 visualize1 <- rbind(number_explained_links, rep(sum(wanted_links_s), 20)-number_explained_links)
 colnames(visualize1) <- 2:21
-barplot(visualize1[,1:14], col = c("slategray4","lightcoral"), xlab = "Maximal Pathlength", ylab = "Number of explained and unexplained links")
+par(mar = c(5,8,4,2)+0.1)
+barplot(cex.names=1.5,cex.axis=1.5, cex.lab = 1.7, visualize1[,1:14], col = c("slategray4","lightcoral"), xlab = "Maximal Pathlength", ylab = "Number of explained and unexplained links")
 
 visualize2 <- rbind(number_explained_links, number_extra_links_through_paths)
 colnames(visualize2) <- 2:21
-barplot(visualize2[,1:14], col = c("slategray4","lightcoral"), xlab = "Maximal Pathlength", ylab = "Number of wanted and additional links")
+barplot(cex.names=1.5,cex.axis=1.5, cex.lab = 1.7, visualize2[,1:14], col = c("slategray4","lightcoral"), xlab = "Maximal Pathlength", ylab = "Number of explanatory and spurious links")
+par(mar = c(5,4,4,2)+0.1)
 
+max(number_explained_links)
+sum(wanted_links_s) - max(number_explained_links)
+which(number_explained_links == max(number_explained_links)) # no change after 13, hence last new explaining link is found with path of length 14
 
 ##### ROC Curve:
 
@@ -528,12 +536,15 @@ fnr <- number_unexplained_links / condition_pos
 fpr <- number_extra_links_through_paths / condition_neg
 tnr <- (condition_neg - number_extra_links_through_paths) / condition_neg
 tpr <- number_explained_links / condition_pos
-
   
-plot(fpr, tpr, type = "b", xlim = c(0,0.3), ylim = c(0,0.3), col = 3, xlab = "False Positive Rate", ylab = "True Positive Rate")
-lines(c(0,0.3), c(0,0.3), col = "gray")
+par(mar = c(5,8,4,2)+0.1)
+plot(cex.names=1.5,cex.axis=1.5, cex.lab = 1.7, fpr, tpr, type = "b", xlim = c(0,0.3), ylim = c(0,0.3), col = "darkgreen", xlab = "False Positive Rate", ylab = "True Positive Rate",pch = 19 )
+lines(c(0,0.3), c(0,0.3), col = "darkgray", lwd = 2)
+par(mar = c(5,4,4,2)+0.1)
 
-max(tpr)
+precision <- number_explained_links/(number_explained_links + number_extra_links_through_paths)
+max(precision)
+which(precision == max(precision))   # 3, hence paths up to length 4
 
 
 ### Do paths that explain causal links have a higher rho then spurious ones?
@@ -557,6 +568,262 @@ m_all_expl[[2]] %>% as.vector() %>% sort(decreasing = TRUE) %>% head()
 
 m_all_spurious[[2]] %>% as.vector() %>% sort(decreasing = TRUE) %>% head()
 ### [1] 0.2823791 0.2592526 0.2590621 0.2410574 0.2356279 0.2318002
+
+
+
+
+######## Preparation FAO dataset ########
+
+load(file = "TS_FI_CAPTURE.RData")
+code_match_countries <- read.csv(file = "CL_FI_COUNTRY_GROUPS.csv") %>% select(Code = UN_Code, Country = Name_En)
+code_match_species <- read.csv(file = "CL_FI_SPECIES_GROUPS.csv") %>% select(Code = X3Alpha_Code, Species = Name_En) %>%
+                        filter(Code %in% c("SAL", "PIN", "CHU", "ONC", "CHE", "SOC", "CHI", "COH", "ORC", "SWI"))
+
+fao <- fao %>%  select(-SYMBOL) %>% filter(SPECIES %in% c("SAL", "PIN", "CHU", "ONC", "CHE", "SOC", "CHI", "COH", "ORC", "SWI")) 
+
+
+code_match_countries[,2] <- as.character(code_match_countries[,2])
+code_match_species[,2] <- as.character(code_match_species[,2])
+code_match_species[,1] <- as.character(code_match_species[,1])
+
+fao_prep <- fao %>% select(-FISHING_AREA, -UNIT, -SPECIES)
+fao_prep <- fao_prep %>% group_by(COUNTRY, YEAR) %>% mutate(total_catch = sum(QUANTITY)) %>% select(-QUANTITY) %>% unique() %>% ungroup()
+
+# 833: Isle of Man reports same amount each year and messes up CCM
+fao_prep <- fao_prep %>% filter(COUNTRY != 833) 
+
+## only 27 countries remain that cpture salmon according to FAO
+fao_countries <- fao_prep %>% select(COUNTRY) %>% unique() %>% .$COUNTRY
+
+save(fao_countries, file = "./intermediate_results/fao_countries.RData" )
+save(fao_prep, file = "./intermediate_results/fao_salmon_data_prepared.RData")
+save(code_match_countries,code_match_species, file = "./intermediate_results/fao_code_match.RData")
+
+######## CCM on FAO Dataset #########
+
+load(file = "./intermediate_results/fao_salmon_data_prepared.RData")
+
+res <- get_links_fao(fao_prep, min_obs = 40, detrend = detrend, nonlin = 0.01)
+res$meta_information
+
+save(res, file = "./intermediate_results/ccm_fao.RData")
+
+
+
+######## Visualization of FAO causal links ########
+
+load(file = "./intermediate_results/ccm_fao.RData")
+load(file = "./intermediate_results/fao_code_match.RData")
+
+links <- res$links
+
+links_s <- links %>% filter(strong_detection == T)   ## 10 strong links
+links_w <- links %>% filter(detection == T)    ## 12 weak links
+
+links_s <- codes_to_names(links_s, cols = c(1,2), match = code_match_countries)
+links_w <- codes_to_names(links_w, cols = c(1,2), match = code_match_countries)
+
+# Visualize strong links
+involved_countries <- c(links_s$lib_column, links_s$target_column) %>% unique()
+m_s <- matrix(NA, length(involved_countries), length(involved_countries))
+colnames(m_s) <- involved_countries
+rownames(m_s) <- involved_countries
+for(i in 1:(dim(links_s)[1])){
+  m_s[links_s$lib_column[i], links_s$target_column[i]] <- links_s$rho[i]
+}
+
+colnames(m_s)[colnames(m_s) == "United Kingdom"] <- "UK"
+rownames(m_s) <- colnames(m_s)
+levelplot(m_s, scales=list( x=list(cex=1.4,rot=65),y=list(cex=1.4), alternating = 2), xlab ="", ylab = "", 
+          #     main = "Strong links between salmon capture data of countries", 
+          col.regions = heat.colors(100)[80:1],at=seq(0, 1, length.out= 80))
+
+# Visualize weak links
+involved_countries <- c(links_w$lib_column, links_w$target_column) %>% unique()
+m_w <- matrix(NA, length(involved_countries), length(involved_countries))
+colnames(m_w) <- involved_countries
+rownames(m_w) <- involved_countries
+for(i in 1:(dim(links_w)[1])){
+  m_w[links_w$lib_column[i], links_w$target_column[i]] <- links_w$rho[i]
+}
+
+colnames(m_w)[colnames(m_w) == "United Kingdom"] <- "UK"
+colnames(m_w)[colnames(m_w) == "United States of America"] <- "USA"
+rownames(m_w) <- colnames(m_w)
+levelplot(m_w, scales=list( x=list(cex=1.4,rot=65),y=list(cex=1.4), alternating = 2), xlab ="", ylab = "", 
+          #   main = "Weak links between salmon capture data of countries", 
+          col.regions = heat.colors(100)[80:1],at=seq(0, 1, length.out= 80))
+
+
+######## Getting country dependencies  from A->B<-C motif (Main dataset, Strong links) ########
+
+
+load(file = "./intermediate_results/ccm_res_fresh_frozen.RData")
+load(file = "./intermediate_results/country_codes.RData")
+load(file = "./intermediate_results/fao_countries.RData")
+
+
+links <- res$links
+links_s <- links %>% filter(strong_detection == TRUE)
+links_w <- links %>% filter(detection == TRUE)
+
+motif_w <- links_w %>% filter(detection == T) %>% filter(B == D)
+involved_countries <- c(motif_w$A, motif_w$C) %>% unique()
+sum(involved_countries %in% fao_countries)        #   20
+motif_s <- links_s %>% filter(strong_detection == T) %>% filter(B == D) 
+involved_countries <- c(motif_s$A, motif_s$C) %>% unique()
+sum(involved_countries %in% fao_countries)        #   17
+
+
+motif_s <- motif_s %>% codes_to_names(match = code_match)
+motif_w <- motif_w %>% codes_to_names(match = code_match)
+
+
+# Visualize strong links
+involved_countries <- c(motif_s$A, motif_s$C) %>% unique()
+m_s <- matrix(NA, length(involved_countries), length(involved_countries))
+colnames(m_s) <- involved_countries
+rownames(m_s) <- involved_countries
+for(i in 1:(dim(motif_s)[1])){
+  m_s[motif_s$A[i], motif_s$C[i]] <- motif_s$rho[i]
+}
+
+colnames(m_s)[colnames(m_s) == "Russian Federation"] <- "Russia"
+colnames(m_s)[colnames(m_s) == "United States of America"] <- "USA"
+colnames(m_s)[colnames(m_s) == "United Kingdom"] <- "UK"
+rownames(m_s) <- colnames(m_s)
+levelplot(m_s, scales=list( x=list(cex=1.6,rot=65),y=list(cex=1.6), alternating = 2), xlab ="", ylab = "", 
+          #     main = "Strong links between salmon capture data of countries", 
+          col.regions = heat.colors(100)[80:1],at=seq(0, 1, length.out= 80))
+
+# Visualize weak links
+involved_countries <- c(motif_w$A, motif_w$C) %>% unique()
+m_w <- matrix(NA, length(involved_countries), length(involved_countries))
+colnames(m_w) <- involved_countries
+rownames(m_w) <- involved_countries
+for(i in 1:(dim(motif_w)[1])){
+  m_w[motif_w$A[i], motif_w$C[i]] <- motif_w$rho[i]
+}
+
+colnames(m_w)[colnames(m_w) == "Russian Federation"] <- "Russia"
+colnames(m_w)[colnames(m_w) == "United States of America"] <- "USA"
+colnames(m_w)[colnames(m_w) == "China, Macao SAR" ] <- "China"
+colnames(m_w)[colnames(m_w) == "United Kingdom"] <- "UK"
+rownames(m_w) <- colnames(m_w)
+levelplot(m_w, scales=list( x=list(cex=1.4,rot=65),y=list(cex=1.4), alternating = 2), xlab ="", ylab = "", 
+          #     main = "Weak links between salmon capture data of countries", 
+          col.regions = heat.colors(100)[80:1],at=seq(0, 1, length.out= 80))
+
+
+
+
+
+
+
+######## Reducing trade network to 27 FAO countries as exporter ########
+
+load(file = "./intermediate_results/prepared_data_fresh_frozen.RData")
+load(file = "./intermediate_results/fao_countries.RData")
+
+dat <- dat %>% filter(exporter %in% fao_countries)
+# reduces dataset from 69813 to 36847 links
+
+save(dat, file = "./intermediate_results/prepared_data_fresh_frozen_fao_countries.RData")
+
+# res <- get_links(dat, min_obs = 60)
+# save(res, file = "ccm_fresh_frozen_fao_countries.RData")
+load(file = "./intermediate_results/ccm_fresh_frozen_fao_countries.RData")
+
+links <- res$links
+
+links_s <- links %>% filter(strong_detection == T)
+links_w <- links %>% filter(detection == T)
+
+# Total strong links: 490
+links_s %>% dim() %>% .[1]
+# motif A -> B <- C: 4
+links_s %>% filter(B == D) %>% dim() %>% .[1]
+# motif A <- B -> C: 24
+links_s %>% filter(A == C) %>% dim() %>% .[1]
+# motif A -> B -> C: 11
+links_s %>% filter(B == C) %>% dim() %>% .[1]
+# motif A -> B <- A: 0
+links_s %>% filter(D == A & C == B) %>% dim() %>% .[1]  
+# motif A <- B <- C: 9
+links_s %>% filter(A == D) %>% dim() %>% .[1]
+# links w/o motif: 442
+links_s %>% filter(D != A & D != B & C != A & C != B) %>% dim() %>% .[1]  
+
+# Total weak links: 1134
+links_w %>% dim() %>% .[1]
+# motif A -> B <- C: 23
+links_w %>% filter(B == D) %>% dim() %>% .[1]
+# motif A <- B -> C: 68
+links_w %>% filter(A == C) %>% dim() %>% .[1] 
+# motif A -> B -> C: 22
+links_w %>% filter(B == C) %>% dim() %>% .[1]
+# motif A -> B -> A: 0
+links_w %>% filter(C == B & D == A) %>% dim() %>% .[1] 
+# motif A <- B <- C: 16
+links_w %>% filter(A == D) %>% dim() %>% .[1]
+# links w/o motif: 1005
+links_w %>% filter(D != A & D != B & C != A & C != B) %>% dim() %>% .[1]  
+
+
+load(file = "./intermediate_results/country_codes.RData")
+
+motif_s <- links_s %>% filter(B == D) 
+involved_countries <- c(motif_s$A, motif_s$C) %>% unique()
+sum(involved_countries %in% fao_countries)
+motif_w <- links_w %>% filter(B == D) 
+involved_countries <- c(motif_s$A, motif_s$C) %>% unique()
+sum(involved_countries %in% fao_countries)
+
+motif_s <- motif_s %>% filter(B == D) %>% codes_to_names(match = code_match)
+motif_w <- motif_w %>% filter(B == D) %>% codes_to_names(match = code_match)
+
+# Visualize strong links
+involved_countries <- c(motif_s$A, motif_s$C) %>% unique()
+m_s <- matrix(NA, length(involved_countries), length(involved_countries))
+colnames(m_s) <- involved_countries
+rownames(m_s) <- involved_countries
+for(i in 1:(dim(motif_s)[1])){
+  m_s[motif_s$A[i], motif_s$C[i]] <- motif_s$rho[i]
+}
+
+colnames(m_s)[colnames(m_s) == "Russian Federation"] <- "Russia"
+colnames(m_s)[colnames(m_s) == "United States of America"] <- "USA"
+colnames(m_s)[colnames(m_s) == "United Kingdom"] <- "UK"
+rownames(m_s) <- colnames(m_s)
+levelplot(m_s, scales=list( x=list(cex=1.4,rot=65),y=list(cex=1.4), alternating = 2), xlab ="", ylab = "", 
+          #     main = "Strong links between salmon capture data of countries", 
+          col.regions = heat.colors(100)[80:1],at=seq(0, 1, length.out= 80))
+
+
+# Visualize weak links
+involved_countries <- c(motif_w$A, motif_w$C) %>% unique()
+m_w <- matrix(NA, length(involved_countries), length(involved_countries))
+colnames(m_w) <- involved_countries
+rownames(m_w) <- involved_countries
+for(i in 1:(dim(motif_w)[1])){
+  m_w[motif_w$A[i], motif_w$C[i]] <- motif_w$rho[i]
+}
+
+colnames(m_w)[colnames(m_w) == "Russian Federation"] <- "Russia"
+colnames(m_w)[colnames(m_w) == "United States of America"] <- "USA"
+colnames(m_w)[colnames(m_w) == "United Kingdom"] <- "UK"
+rownames(m_w) <- colnames(m_w)
+levelplot(m_w, scales=list( x=list(cex=1.4,rot=65),y=list(cex=1.4), alternating = 2), xlab ="", ylab = "", 
+          #     main = "Weak links between salmon capture data of countries", 
+          col.regions = heat.colors(100)[80:1],at=seq(0, 1, length.out= 80))
+
+
+
+
+
+
+
+
 
 
 ######## Analysis Links for only fresh #######
@@ -909,63 +1176,6 @@ m_all_expl[[2]] %>% as.vector() %>% sort(decreasing = TRUE) %>% head()
 
 m_all_spurious[[2]] %>% as.vector() %>% sort(decreasing = TRUE) %>% head()
 # [1] 0.2163682 0.1866366 0.1721670 0.1707119 0.1654798 0.1640326
-
-
-
-
-######## Getting country dependencies from A->B<-C motif ########
-
-
-load(file = "./intermediate_results/ccm_res_fresh_frozen.RData")
-load(file = "./intermediate_results/country_codes.RData")
-
-links <- res$links
-
-links_w <- links %>% filter(detection == T)
-links_s <- links_w %>% filter(strong_detection == T)
-
-motif_s <- links_s %>% filter(B == D) %>% codes_to_names(match = code_match)
-motif_w <- links_w %>% filter(B == D) %>% codes_to_names(match = code_match)
-
-# Visualize strong links
-involved_countries <- c(motif_s$A, motif_s$C) %>% unique()
-m_s <- matrix(NA, length(involved_countries), length(involved_countries))
-colnames(m_s) <- involved_countries
-rownames(m_s) <- involved_countries
-for(i in 1:(dim(motif_s)[1])){
-  m_s[motif_s$A[i], motif_s$C[i]] <- motif_s$rho[i]
-}
-
-colnames(m_s)[colnames(m_s) == "Russian Federation"] <- "Russia"
-colnames(m_s)[colnames(m_s) == "United States of America"] <- "USA"
-colnames(m_s)[colnames(m_s) == "United Kingdom"] <- "UK"
-rownames(m_s) <- colnames(m_s)
-levelplot(m_s, scales=list(x=list(rot=40), alternating = 2), xlab ="", ylab = "", 
-          #     main = "Strong links between salmon capture data of countries", 
-          col.regions = heat.colors(100)[80:1],at=seq(0, 1, length.out= 80))
-
-
-# Visualize weak links
-involved_countries <- c(motif_w$A, motif_w$C) %>% unique()
-m_w <- matrix(NA, length(involved_countries), length(involved_countries))
-colnames(m_w) <- involved_countries
-rownames(m_w) <- involved_countries
-for(i in 1:(dim(motif_w)[1])){
-  m_w[motif_w$A[i], motif_w$C[i]] <- motif_w$rho[i]
-}
-
-colnames(m_w)[colnames(m_w) == "Russian Federation"] <- "Russia"
-colnames(m_w)[colnames(m_w) == "United States of America"] <- "USA"
-colnames(m_w)[colnames(m_w) == "United Kingdom"] <- "UK"
-rownames(m_w) <- colnames(m_w)
-levelplot(m_w, scales=list(x=list(rot=40), alternating = 2), xlab ="", ylab = "", 
-          #     main = "Weak links between salmon capture data of countries", 
-          col.regions = heat.colors(100)[80:1],at=seq(0, 1, length.out= 80))
-
-
-
-
-
 
 
 
@@ -1335,183 +1545,6 @@ barplot(visualize1[,1:14], col = c("slategray4","lightcoral"), xlab = "Maximal P
 visualize2 <- rbind(number_explained_links, number_extra_links_through_paths)
 colnames(visualize2) <- 2:21
 barplot(visualize2[,1:14], col = c("slategray4","lightcoral"), xlab = "Maximal Pathlength", ylab = "Number of wanted and additional links")
-
-
-
-
-######## Preparation FAO dataset ########
-
-fao <- read.csv(file = "TS_FI_CAPTURE.csv")
-code_match_countries <- read.csv(file = "CL_FI_COUNTRY_GROUPS.csv") %>% select(Code = UN_Code, Country = Name_En)
-code_match_species <- read.csv(file = "CL_FI_SPECIES_GROUPS.csv") %>% select(Code = X3Alpha_Code, Species = Name_En) %>%
-                        filter(Code %in% c("SAL", "PIN", "CHU", "ONC", "CHE", "SOC", "CHI", "COH", "ORC", "SWI"))
-
-fao <- fao %>%  select(-SYMBOL) %>% filter(SPECIES %in% c("SAL", "PIN", "CHU", "ONC", "CHE", "SOC", "CHI", "COH", "ORC", "SWI")) 
-## only 28 countries cpture salmon according to FAO
-fao_countries <- fao %>% select(COUNTRY) %>% unique() %>% .[,1]
-
-save(fao_countries, file = "./intermediate_results/fao_countries.RData" )
-
-code_match_countries[,2] <- as.character(code_match_countries[,2])
-code_match_species[,2] <- as.character(code_match_species[,2])
-code_match_species[,1] <- as.character(code_match_species[,1])
-
-fao_prep <- fao %>% select(-FISHING_AREA, -UNIT, -SPECIES)
-fao_prep <- fao_prep %>% group_by(COUNTRY, YEAR) %>% mutate(total_catch = sum(QUANTITY)) %>% select(-QUANTITY) %>% unique() %>% ungroup()
-
-# 833: Isle of Man reports same amount each year and messes up CC
-fao_prep <- fao_prep %>% filter(COUNTRY != 833) 
-
-save(fao_prep, file = "./intermediate_results/fao_salmon_data_prepared.RData")
-save(code_match_countries,code_match_species, file = "./intermediate_results/fao_code_match.RData")
-
-######## CCM on FAO Dataset #########
-
-load(file = "./intermediate_results/fao_salmon_data_prepared.RData")
-
-res <- get_links_fao(fao_prep, min_obs = 40, detrend = detrend, nonlin = 0.01)
-
-save(res, file = "./intermediate_results/ccm_fao.RData")
-
-######## Visualization of FAO causal links ########
-
-load(file = "./intermediate_results/ccm_fao.RData")
-load(file = "./intermediate_results/fao_code_match.RData")
-
-links <- res$links
-
-links_s <- links %>% filter(strong_detection == T)   ## 10 strong links
-links_w <- links %>% filter(detection == T)    ## 12 weak links
-
-links_s <- codes_to_names(links_s, cols = c(1,2), match = code_match_countries)
-links_w <- codes_to_names(links_w, cols = c(1,2), match = code_match_countries)
-
-# Visualize strong links
-involved_countries <- c(links_s$lib_column, links_s$target_column) %>% unique()
-m_s <- matrix(NA, length(involved_countries), length(involved_countries))
-colnames(m_s) <- involved_countries
-rownames(m_s) <- involved_countries
-for(i in 1:(dim(links_s)[1])){
-  m_s[links_s$lib_column[i], links_s$target_column[i]] <- links_s$rho[i]
-}
-
-colnames(m_s)[colnames(m_s) == "United Kingdom"] <- "UK"
-rownames(m_s) <- colnames(m_s)
-levelplot(m_s, scales=list(x=list(rot=40), alternating = 2), xlab ="", ylab = "", 
-          #     main = "Strong links between salmon capture data of countries", 
-          col.regions = heat.colors(100)[80:1],at=seq(0, 1, length.out= 80))
-
-# Visualize weak links
-involved_countries <- c(links_w$lib_column, links_w$target_column) %>% unique()
-m_w <- matrix(NA, length(involved_countries), length(involved_countries))
-colnames(m_w) <- involved_countries
-rownames(m_w) <- involved_countries
-for(i in 1:(dim(links_w)[1])){
-  m_w[links_w$lib_column[i], links_w$target_column[i]] <- links_w$rho[i]
-}
-
-colnames(m_w)[colnames(m_w) == "United Kingdom"] <- "UK"
-colnames(m_w)[colnames(m_w) == "United States of America"] <- "USA"
-rownames(m_w) <- colnames(m_w)
-levelplot(m_w, scales=list(x=list(rot=40),alternating=2), xlab ="", ylab = "", 
-          #   main = "Weak links between salmon capture data of countries", 
-          col.regions = heat.colors(100)[80:1],at=seq(0, 1, length.out= 80))
-
-
-
-
-
-
-######## Reducing trade network to 28 FAO countries as exporter ########
-
-load(file = "./intermediate_results/prepared_data_fresh_frozen.RData")
-load(file = "./intermediate_results/fao_countries.RData")
-
-dat <- dat %>% filter(exporter %in% fao_countries)
-# reduces dataset from 69813 to 36847 links
-
-save(dat, file = "./intermediate_results/prepared_data_fresh_frozen_fao_countries.RData")
-
-# res <- get_links(dat, min_obs = 60)
-# save(res, file = "ccm_fresh_frozen_fao_countries.RData")
-load(file = "./intermediate_results/ccm_fresh_frozen_fao_countries.RData")
-
-links <- res$links
-
-links_s <- links %>% filter(strong_detection == T)
-links_w <- links %>% filter(detection == T)
-
-# Total strong links: 490
-links_s %>% dim() %>% .[1]
-# motif A -> B <- C: 4
-links_s %>% filter(B == D) %>% dim() %>% .[1]
-# motif A <- B -> C: 24
-links_s %>% filter(A == C) %>% dim() %>% .[1]
-# motif A -> B -> C: 11
-links_s %>% filter(B == C) %>% dim() %>% .[1]
-# motif A -> B <- A: 0
-links_s %>% filter(D == A & C == B) %>% dim() %>% .[1]  
-# motif A <- B <- C: 9
-links_s %>% filter(A == D) %>% dim() %>% .[1]
-# links w/o motif: 442
-links_s %>% filter(D != A & D != B & C != A & C != B) %>% dim() %>% .[1]  
-
-# Total weak links: 1134
-links_w %>% dim() %>% .[1]
-# motif A -> B <- C: 23
-links_w %>% filter(B == D) %>% dim() %>% .[1]
-# motif A <- B -> C: 68
-links_w %>% filter(A == C) %>% dim() %>% .[1] 
-# motif A -> B -> C: 22
-links_w %>% filter(B == C) %>% dim() %>% .[1]
-# motif A -> B -> A: 0
-links_w %>% filter(C == B & D == A) %>% dim() %>% .[1] 
-# motif A <- B <- C: 16
-links_w %>% filter(A == D) %>% dim() %>% .[1]
-# links w/o motif: 1005
-links_w %>% filter(D != A & D != B & C != A & C != B) %>% dim() %>% .[1]  
-
-
-load(file = "./intermediate_results/country_codes.RData")
-
-motif_s <- links_s %>% filter(B == D) %>% codes_to_names(match = code_match)
-motif_w <- links_w %>% filter(B == D) %>% codes_to_names(match = code_match)
-
-# Visualize strong links
-involved_countries <- c(motif_s$A, motif_s$C) %>% unique()
-m_s <- matrix(NA, length(involved_countries), length(involved_countries))
-colnames(m_s) <- involved_countries
-rownames(m_s) <- involved_countries
-for(i in 1:(dim(motif_s)[1])){
-  m_s[motif_s$A[i], motif_s$C[i]] <- motif_s$rho[i]
-}
-
-colnames(m_s)[colnames(m_s) == "Russian Federation"] <- "Russia"
-colnames(m_s)[colnames(m_s) == "United States of America"] <- "USA"
-colnames(m_s)[colnames(m_s) == "United Kingdom"] <- "UK"
-rownames(m_s) <- colnames(m_s)
-levelplot(m_s, scales=list(x=list(rot=40), alternating = 2), xlab ="", ylab = "", 
-          #     main = "Strong links between salmon capture data of countries", 
-          col.regions = heat.colors(100)[80:1],at=seq(0, 1, length.out= 80))
-
-
-# Visualize weak links
-involved_countries <- c(motif_w$A, motif_w$C) %>% unique()
-m_w <- matrix(NA, length(involved_countries), length(involved_countries))
-colnames(m_w) <- involved_countries
-rownames(m_w) <- involved_countries
-for(i in 1:(dim(motif_w)[1])){
-  m_w[motif_w$A[i], motif_w$C[i]] <- motif_w$rho[i]
-}
-
-colnames(m_w)[colnames(m_w) == "Russian Federation"] <- "Russia"
-colnames(m_w)[colnames(m_w) == "United States of America"] <- "USA"
-colnames(m_w)[colnames(m_w) == "United Kingdom"] <- "UK"
-rownames(m_w) <- colnames(m_w)
-levelplot(m_w, scales=list(x=list(rot=40), alternating = 2), xlab ="", ylab = "", 
-          #     main = "Weak links between salmon capture data of countries", 
-          col.regions = heat.colors(100)[80:1],at=seq(0, 1, length.out= 80))
-
 
 
 
